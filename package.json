@@ -1,0 +1,18 @@
+{
+  "name": "mernchatroom",
+  "version": "1.0.0",
+  "description": "To run the project Backend = npm i and then type npm run dev Frontend = npm i and then type npm start",
+  "main": "index.js",
+  "scripts": {
+    "install:all": "npm run install:backend && npm run install:frontend",
+    "install:backend": "cd backend && npm install",
+    "install:frontend": "cd frontend && npm install",
+    "start:all": "npm run start:backend && npm run start:frontend",
+    "start:backend": "cd backend && npm run dev",
+    "start:frontend": "cd frontend && npm start",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}
