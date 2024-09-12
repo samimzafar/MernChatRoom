@@ -14,14 +14,20 @@ import {
   ModalFooter,
   ModalBody,
   ModalCloseButton,
+  FormControl,
+  Input,
+  Tooltip,
 } from "@chakra-ui/react";
 import axios from "axios";
 import { MdCheckCircle } from "react-icons/md";
+import RoomChats from "./RoomChats";
 
 const AllRooms = () => {
   const [rooms, setRooms] = useState([]);
   const [selectedRoom, setSelectedRoom] = useState(null);
   const [currentUser, setCurrentUser] = useState(null);
+  const [messages, setMessages] = useState([]);
+  const [newMessage, setNewMessage] = useState("");
 
   const { isOpen, onOpen, onClose } = useDisclosure();
 
@@ -55,17 +61,27 @@ const AllRooms = () => {
 
   const handleRoomClick = (room) => {
     setSelectedRoom(room);
+    fetchMessages(room._id);
   };
 
   const handleHeaderClick = () => {
-    if (!selectedRoom?.participants.some((p) => p._id === currentUser?._id)) {
-      onOpen();
-    }
+    onOpen();
   };
 
   const handleJoinRoom = async () => {
     try {
       await axios.post("/api/room/join", { roomId: selectedRoom._id });
+      setSelectedRoom((prevRoom) => ({
+        ...prevRoom,
+        participants: [...prevRoom.participants, currentUser],
+      }));
+      setRooms((prevRooms) =>
+        prevRooms.map((room) =>
+          room._id === selectedRoom._id
+            ? { ...room, participants: [...room.participants, currentUser] }
+            : room
+        )
+      );
       toast({
         title: "You Joined The Room",
         status: "success",
@@ -79,6 +95,47 @@ const AllRooms = () => {
         status: "warning",
         duration: 5000,
         isClosable: true,
+      });
+    }
+  };
+
+  const handleLeaveRoom = async () => {
+    try {
+      await axios.post("/api/room/leave", { roomId: selectedRoom._id });
+      setSelectedRoom((prevRoom) => ({
+        ...prevRoom,
+        participants: prevRoom.participants.filter(
+          (p) => p._id !== currentUser._id
+        ),
+      }));
+      setRooms((prevRooms) =>
+        prevRooms.map((room) =>
+          room._id === selectedRoom._id
+            ? {
+                ...room,
+                participants: room.participants.filter(
+                  (p) => p._id !== currentUser._id
+                ),
+              }
+            : room
+        )
+      );
+
+      toast({
+        title: "You Left The Room",
+        status: "success",
+        duration: 5000,
+        isClosable: true,
+        position: "top",
+      });
+      onClose();
+    } catch (error) {
+      toast({
+        title: "Error While Leaving The Room",
+        status: "warning",
+        duration: 5000,
+        isClosable: true,
+        position: "top",
       });
     }
   };
@@ -100,6 +157,53 @@ const AllRooms = () => {
         duration: 5000,
         isClosable: true,
       });
+    }
+  };
+
+  const isParticipant = selectedRoom?.participants.some(
+    (p) => p._id === currentUser?._id
+  );
+
+  const fetchMessages = async (roomId) => {
+    try {
+      const { data } = await axios.get(`/api/messages/${roomId}`);
+      setMessages(data.data); // Store messages in state
+    } catch (error) {
+      console.error("Error fetching messages:", error);
+      toast({
+        title: "Error fetching messages",
+        status: "warning",
+        duration: 5000,
+        isClosable: true,
+      });
+    }
+  };
+
+  const handleSendMessage = async () => {
+    if (!newMessage.trim()) return;
+
+    try {
+      const { data } = await axios.post("api/messages/send", {
+        roomId: selectedRoom._id,
+        content: newMessage,
+      });
+
+      setMessages((prevMessages) => [...prevMessages, data.data]);
+      setNewMessage("");
+    } catch (error) {
+      toast({
+        title: "Message Not Sent",
+        status: "error",
+        duration: 5000,
+        isClosable: true,
+      });
+    }
+  };
+  const handleKeyDown = (e) => {
+    if (e.key === "Enter") {
+      if (isParticipant) {
+        handleSendMessage(); // Only send message if user is a participant
+      }
     }
   };
 
@@ -157,10 +261,31 @@ const AllRooms = () => {
             </Box>
 
             {/* Chat Content */}
-            <Box flex="1" p={4} overflowY="auto">
-              {/* Display chat messages or room content here */}
-              <Text>Chatroom messages will be displayed here...</Text>
-            </Box>
+            <RoomChats messages={messages} currentUser={currentUser} />
+            {/* Chat Input */}
+            <FormControl mt={4} display="flex">
+              <Input
+                placeholder="Type your message..."
+                value={newMessage}
+                onChange={(e) => setNewMessage(e.target.value)}
+                onKeyDown={handleKeyDown}
+                isDisabled={!isParticipant}
+              />
+              <Tooltip
+                label="Join the room to send a message"
+                isDisabled={isParticipant}
+                placement="top"
+              >
+                <Button
+                  ml={2}
+                  colorScheme="blue"
+                  onClick={handleSendMessage}
+                  disabled={!isParticipant}
+                >
+                  Send
+                </Button>
+              </Tooltip>
+            </FormControl>
           </>
         ) : (
           <Text>Select a room to view details</Text>
@@ -174,12 +299,22 @@ const AllRooms = () => {
           <ModalHeader>{selectedRoom?.name}</ModalHeader>
           <ModalCloseButton />
           <ModalBody>
-            <Text>Do you want to join or delete this room?</Text>
+            {isParticipant ? (
+              <Text>Would you like to leave or delete this room?</Text>
+            ) : (
+              <Text>Do you want to join or delete this room?</Text>
+            )}
           </ModalBody>
           <ModalFooter>
-            <Button colorScheme="green" onClick={handleJoinRoom} mr={3}>
-              Join Room
-            </Button>
+            {isParticipant ? (
+              <Button colorScheme="yellow" onClick={handleLeaveRoom} mr={3}>
+                Leave Room
+              </Button>
+            ) : (
+              <Button colorScheme="green" onClick={handleJoinRoom} mr={3}>
+                Join Room
+              </Button>
+            )}
             <Button colorScheme="red" onClick={handleDeleteRoom}>
               Delete Room
             </Button>
@@ -191,4 +326,3 @@ const AllRooms = () => {
 };
 
 export default AllRooms;
-
